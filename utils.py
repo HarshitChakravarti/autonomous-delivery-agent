@@ -1,3 +1,4 @@
+# Utility functions including priority queue implementation and Manhattan distance heuristic
 import heapq
 
 class MyPriorityQueue:

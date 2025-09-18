@@ -1,3 +1,4 @@
+# GridCity environment class that manages the 2D grid world, obstacles, terrain costs, and agent navigation
 class GridCity:
     def __init__(self, map_filepath):
         self.grid = []

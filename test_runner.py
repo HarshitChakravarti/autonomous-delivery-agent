@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-
+# Comprehensive test suite that runs all pathfinding algorithms on all map configurations
 import subprocess
 import sys
 import os

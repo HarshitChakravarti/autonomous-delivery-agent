@@ -1,3 +1,4 @@
+# Main entry point with CLI interface for running autonomous delivery agent simulations
 import argparse
 import sys
 import os
