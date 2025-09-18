@@ -5,9 +5,13 @@ class GridCity:
         self.dynamic_obstacles = {}
         self.start_pos = None
         self.goal_pos = None
+        self.visited_cells = set()
+        self.cell_visit_count = {}
+        self.map_metadata = {'width': 0, 'height': 0, 'terrain_types': set()}
         
         self._load_map(map_filepath)
         self._setup_dynamic_obstacles()
+        self._analyze_terrain()
     
     def _load_map(self, map_filepath):
         with open(map_filepath, 'r') as file:
@@ -40,12 +44,35 @@ class GridCity:
         
         self.height = len(self.grid)
         self.width = len(self.grid[0]) if self.grid else 0
+        self.map_metadata['width'] = self.width
+        self.map_metadata['height'] = self.height
     
     def _setup_dynamic_obstacles(self):
         self.dynamic_obstacles = {
             3: [(1, 2)],
             5: [(2, 1), (2, 2)],
         }
+    
+    def _analyze_terrain(self):
+        for row in self.grid:
+            for cell_cost in row:
+                if cell_cost != float('inf'):
+                    self.map_metadata['terrain_types'].add(cell_cost)
+    
+    def mark_cell_visited(self, position):
+        self.visited_cells.add(position)
+        self.cell_visit_count[position] = self.cell_visit_count.get(position, 0) + 1
+    
+    def get_visit_stats(self):
+        return {
+            'total_visited': len(self.visited_cells),
+            'most_visited': max(self.cell_visit_count.items(), key=lambda x: x[1]) if self.cell_visit_count else None,
+            'visit_distribution': dict(self.cell_visit_count)
+        }
+    
+    def reset_visit_tracking(self):
+        self.visited_cells.clear()
+        self.cell_visit_count.clear()
     
     def get_cost(self, position):
         row, col = position

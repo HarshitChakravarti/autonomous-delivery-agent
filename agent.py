@@ -1,117 +1,137 @@
 from collections import deque
-from utils import PriorityQueue, manhattan_distance
+from utils import MyPriorityQueue, calculate_manhattan_heuristic
 import time
+import random
 
 class DeliveryAgent:
     def __init__(self, environment):
         self.env = environment
         self.start_pos = environment.start_pos
         self.goal_pos = environment.goal_pos
+        self.debug_mode = False
+        self.path_history = []
+        self.performance_stats = {'total_searches': 0, 'successful_searches': 0}
 
-    def _reconstruct_path(self, came_from, current):
-        path = []
-        while current is not None:
-            path.append(current)
-            current = came_from.get(current)
-        path.reverse()
-        return path
+    def _build_path_backwards(self, parent_map, current_node):
+        path_trace = []
+        while current_node is not None:
+            path_trace.append(current_node)
+            current_node = parent_map.get(current_node)
+        path_trace.reverse()
+        return path_trace
 
     def bfs(self):
-        start_time = time.time()
+        self.performance_stats['total_searches'] += 1
+        start_timer = time.time()
         
         if not self.start_pos or not self.goal_pos:
             return {'path': None, 'cost': float('inf'), 'nodes_expanded': 0, 'time': 0}
         
-        queue = deque([self.start_pos])
-        came_from = {self.start_pos: None}
-        visited = {self.start_pos}
-        nodes_expanded = 0
+        search_queue = deque([self.start_pos])
+        parent_tracker = {self.start_pos: None}
+        explored_nodes = {self.start_pos}
+        expansion_count = 0
         
-        while queue:
-            current = queue.popleft()
-            nodes_expanded += 1
-            
-            if current == self.goal_pos:
-                path = self._reconstruct_path(came_from, current)
-                total_cost = sum(self.env.get_cost(pos) for pos in path)
-                elapsed_time = time.time() - start_time
-                return {'path': path, 'cost': total_cost, 'nodes_expanded': nodes_expanded, 'time': elapsed_time}
-            
-            for neighbor, _ in self.env.get_neighbors(current):
-                if neighbor not in visited:
-                    visited.add(neighbor)
-                    came_from[neighbor] = current
-                    queue.append(neighbor)
+        if self.debug_mode:
+            print(f"Starting BFS from {self.start_pos} to {self.goal_pos}")
         
-        elapsed_time = time.time() - start_time
-        return {'path': None, 'cost': float('inf'), 'nodes_expanded': nodes_expanded, 'time': elapsed_time}
+        while search_queue:
+            current_node = search_queue.popleft()
+            expansion_count += 1
+            
+            if self.debug_mode and expansion_count % 10 == 0:
+                print(f"Expanded {expansion_count} nodes, current: {current_node}")
+            
+            if current_node == self.goal_pos:
+                final_path = self._build_path_backwards(parent_tracker, current_node)
+                total_path_cost = sum(self.env.get_cost(pos) for pos in final_path)
+                execution_time = time.time() - start_timer
+                self.performance_stats['successful_searches'] += 1
+                self.path_history.append(('BFS', final_path, execution_time))
+                return {'path': final_path, 'cost': total_path_cost, 'nodes_expanded': expansion_count, 'time': execution_time}
+            
+            for neighbor_node, _ in self.env.get_neighbors(current_node):
+                if neighbor_node not in explored_nodes:
+                    explored_nodes.add(neighbor_node)
+                    parent_tracker[neighbor_node] = current_node
+                    search_queue.append(neighbor_node)
+        
+        execution_time = time.time() - start_timer
+        return {'path': None, 'cost': float('inf'), 'nodes_expanded': expansion_count, 'time': execution_time}
 
     def ucs(self):
-        start_time = time.time()
+        self.performance_stats['total_searches'] += 1
+        start_timer = time.time()
         
         if not self.start_pos or not self.goal_pos:
             return {'path': None, 'cost': float('inf'), 'nodes_expanded': 0, 'time': 0}
         
-        frontier = PriorityQueue()
-        frontier.put(self.start_pos, 0)
-        came_from = {self.start_pos: None}
-        cost_so_far = {self.start_pos: 0}
-        nodes_expanded = 0
+        priority_frontier = MyPriorityQueue()
+        priority_frontier.enqueue(self.start_pos, 0)
+        parent_mapping = {self.start_pos: None}
+        cost_tracker = {self.start_pos: 0}
+        expansion_count = 0
         
-        while not frontier.empty():
-            current = frontier.get()
-            nodes_expanded += 1
+        while not priority_frontier.is_empty():
+            current_node = priority_frontier.dequeue()
+            expansion_count += 1
             
-            if current == self.goal_pos:
-                path = self._reconstruct_path(came_from, current)
-                total_cost = cost_so_far[current]
-                elapsed_time = time.time() - start_time
-                return {'path': path, 'cost': total_cost, 'nodes_expanded': nodes_expanded, 'time': elapsed_time}
+            if current_node == self.goal_pos:
+                final_path = self._build_path_backwards(parent_mapping, current_node)
+                total_cost = cost_tracker[current_node]
+                execution_time = time.time() - start_timer
+                self.performance_stats['successful_searches'] += 1
+                self.path_history.append(('UCS', final_path, execution_time))
+                return {'path': final_path, 'cost': total_cost, 'nodes_expanded': expansion_count, 'time': execution_time}
             
-            for neighbor, move_cost in self.env.get_neighbors(current):
-                new_cost = cost_so_far[current] + move_cost
+            for neighbor_node, move_cost in self.env.get_neighbors(current_node):
+                new_total_cost = cost_tracker[current_node] + move_cost
                 
-                if neighbor not in cost_so_far or new_cost < cost_so_far[neighbor]:
-                    cost_so_far[neighbor] = new_cost
-                    came_from[neighbor] = current
-                    frontier.put(neighbor, new_cost)
+                if neighbor_node not in cost_tracker or new_total_cost < cost_tracker[neighbor_node]:
+                    cost_tracker[neighbor_node] = new_total_cost
+                    parent_mapping[neighbor_node] = current_node
+                    priority_frontier.enqueue(neighbor_node, new_total_cost)
         
-        elapsed_time = time.time() - start_time
-        return {'path': None, 'cost': float('inf'), 'nodes_expanded': nodes_expanded, 'time': elapsed_time}
+        execution_time = time.time() - start_timer
+        return {'path': None, 'cost': float('inf'), 'nodes_expanded': expansion_count, 'time': execution_time}
 
     def a_star(self):
-        start_time = time.time()
+        self.performance_stats['total_searches'] += 1
+        start_timer = time.time()
         
         if not self.start_pos or not self.goal_pos:
             return {'path': None, 'cost': float('inf'), 'nodes_expanded': 0, 'time': 0}
         
-        frontier = PriorityQueue()
-        frontier.put(self.start_pos, 0)
-        came_from = {self.start_pos: None}
-        cost_so_far = {self.start_pos: 0}
-        nodes_expanded = 0
+        search_frontier = MyPriorityQueue()
+        search_frontier.enqueue(self.start_pos, 0)
+        parent_mapping = {self.start_pos: None}
+        cost_tracker = {self.start_pos: 0}
+        expansion_count = 0
         
-        while not frontier.empty():
-            current = frontier.get()
-            nodes_expanded += 1
+        while not search_frontier.is_empty():
+            current_node = search_frontier.dequeue()
+            expansion_count += 1
             
-            if current == self.goal_pos:
-                path = self._reconstruct_path(came_from, current)
-                total_cost = cost_so_far[current]
-                elapsed_time = time.time() - start_time
-                return {'path': path, 'cost': total_cost, 'nodes_expanded': nodes_expanded, 'time': elapsed_time}
+            if current_node == self.goal_pos:
+                final_path = self._build_path_backwards(parent_mapping, current_node)
+                total_cost = cost_tracker[current_node]
+                execution_time = time.time() - start_timer
+                self.performance_stats['successful_searches'] += 1
+                self.path_history.append(('A*', final_path, execution_time))
+                return {'path': final_path, 'cost': total_cost, 'nodes_expanded': expansion_count, 'time': execution_time}
             
-            for neighbor, move_cost in self.env.get_neighbors(current):
-                new_cost = cost_so_far[current] + move_cost
+            for neighbor_node, move_cost in self.env.get_neighbors(current_node):
+                new_total_cost = cost_tracker[current_node] + move_cost
                 
-                if neighbor not in cost_so_far or new_cost < cost_so_far[neighbor]:
-                    cost_so_far[neighbor] = new_cost
-                    priority = new_cost + manhattan_distance(neighbor, self.goal_pos)
-                    came_from[neighbor] = current
-                    frontier.put(neighbor, priority)
+                if neighbor_node not in cost_tracker or new_total_cost < cost_tracker[neighbor_node]:
+                    cost_tracker[neighbor_node] = new_total_cost
+                    heuristic_value = calculate_manhattan_heuristic(neighbor_node, self.goal_pos)
+                    f_score = new_total_cost + heuristic_value
+                    parent_mapping[neighbor_node] = current_node
+                    search_frontier.enqueue(neighbor_node, f_score)
         
-        elapsed_time = time.time() - start_time
-        return {'path': None, 'cost': float('inf'), 'nodes_expanded': nodes_expanded, 'time': elapsed_time}
+        execution_time = time.time() - start_timer
+        return {'path': None, 'cost': float('inf'), 'nodes_expanded': expansion_count, 'time': execution_time}
 
     def dynamic_replanning_demo(self):
         log = []
@@ -180,3 +200,26 @@ class DeliveryAgent:
         log.append("Dynamic replanning demo completed successfully!")
         
         return "\n".join(log)
+    
+    def enable_debug_mode(self):
+        self.debug_mode = True
+        print("Debug mode enabled - will show search progress")
+    
+    def disable_debug_mode(self):
+        self.debug_mode = False
+        print("Debug mode disabled")
+    
+    def get_performance_summary(self):
+        success_rate = (self.performance_stats['successful_searches'] / 
+                       self.performance_stats['total_searches'] * 100) if self.performance_stats['total_searches'] > 0 else 0
+        return {
+            'total_searches': self.performance_stats['total_searches'],
+            'successful_searches': self.performance_stats['successful_searches'],
+            'success_rate': f"{success_rate:.1f}%",
+            'path_history_count': len(self.path_history)
+        }
+    
+    def clear_history(self):
+        self.path_history = []
+        self.performance_stats = {'total_searches': 0, 'successful_searches': 0}
+        print("Performance history cleared")

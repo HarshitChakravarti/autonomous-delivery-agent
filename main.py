@@ -1,6 +1,8 @@
 import argparse
 import sys
 import os
+import json
+from datetime import datetime
 from environment import GridCity
 from agent import DeliveryAgent
 
@@ -10,6 +12,9 @@ def main():
     parser.add_argument("--algo", type=str, required=True,
                         choices=['bfs', 'ucs', 'a_star', 'dynamic_demo'],
                         help="Algorithm to use.")
+    parser.add_argument("--debug", action='store_true', help="Enable debug mode")
+    parser.add_argument("--stats", action='store_true', help="Show performance statistics")
+    parser.add_argument("--output", type=str, help="Save results to JSON file")
     args = parser.parse_args()
 
     if not os.path.exists(args.map):
@@ -19,6 +24,9 @@ def main():
     try:
         env = GridCity(args.map)
         agent = DeliveryAgent(env)
+        
+        if args.debug:
+            agent.enable_debug_mode()
         
         if not env.start_pos:
             print("Error: No start position (S) found in the map!")
@@ -30,6 +38,7 @@ def main():
         print(f"Map loaded: {env.width}x{env.height}")
         print(f"Start position: {env.start_pos}")
         print(f"Goal position: {env.goal_pos}")
+        print(f"Terrain types found: {sorted(env.map_metadata['terrain_types'])}")
         print()
 
         if args.algo == 'bfs':
@@ -51,6 +60,25 @@ def main():
             print(f" -> Path: {result['path']}")
         print(f"Nodes Expanded: {result['nodes_expanded']}")
         print(f"Time Taken: {result['time']:.6f} seconds")
+        
+        if args.stats:
+            print("\n=== Performance Statistics ===")
+            stats = agent.get_performance_summary()
+            for key, value in stats.items():
+                print(f"{key.replace('_', ' ').title()}: {value}")
+        
+        if args.output:
+            output_data = {
+                'timestamp': datetime.now().isoformat(),
+                'map_file': args.map,
+                'algorithm': args.algo,
+                'result': result,
+                'environment_stats': env.get_visit_stats() if hasattr(env, 'get_visit_stats') else {},
+                'agent_stats': agent.get_performance_summary()
+            }
+            with open(args.output, 'w') as f:
+                json.dump(output_data, f, indent=2)
+            print(f"\nResults saved to {args.output}")
 
     except Exception as e:
         print(f"Error: {str(e)}")

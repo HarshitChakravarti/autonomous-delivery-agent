@@ -1,19 +1,23 @@
 import heapq
 
-class PriorityQueue:
+class MyPriorityQueue:
     def __init__(self):
-        self.elements = []
+        self.heap_data = []
+        self._counter = 0
 
-    def empty(self):
-        return not self.elements
+    def is_empty(self):
+        return len(self.heap_data) == 0
 
-    def put(self, item, priority):
-        heapq.heappush(self.elements, (priority, item))
+    def enqueue(self, item, priority):
+        self._counter += 1
+        heapq.heappush(self.heap_data, (priority, self._counter, item))
 
-    def get(self):
-        return heapq.heappop(self.elements)[1]
+    def dequeue(self):
+        if self.is_empty():
+            raise IndexError("Queue is empty")
+        return heapq.heappop(self.heap_data)[2]
 
-def manhattan_distance(pos1, pos2):
-    (x1, y1) = pos1
-    (x2, y2) = pos2
+def calculate_manhattan_heuristic(start_pos, end_pos):
+    x1, y1 = start_pos
+    x2, y2 = end_pos
     return abs(x1 - x2) + abs(y1 - y2)
