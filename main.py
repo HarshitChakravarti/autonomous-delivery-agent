@@ -1,4 +1,3 @@
-# main.py
 import argparse
 import sys
 import os
@@ -13,17 +12,14 @@ def main():
                         help="Algorithm to use.")
     args = parser.parse_args()
 
-    # Check if map file exists
     if not os.path.exists(args.map):
         print(f"Error: Map file '{args.map}' not found!")
         sys.exit(1)
 
     try:
-        # 1. Initialize environment and agent
         env = GridCity(args.map)
         agent = DeliveryAgent(env)
         
-        # Check if start and goal positions are defined
         if not env.start_pos:
             print("Error: No start position (S) found in the map!")
             sys.exit(1)
@@ -36,7 +32,6 @@ def main():
         print(f"Goal position: {env.goal_pos}")
         print()
 
-        # 2. Select and run the algorithm
         if args.algo == 'bfs':
             result = agent.bfs()
         elif args.algo == 'ucs':
@@ -48,7 +43,6 @@ def main():
             print(log)
             return
 
-        # 3. Print the results in a clean, readable format
         print(f"Algorithm: {args.algo.upper()}")
         print(f"Path Found: {'Yes' if result['path'] else 'No'}")
         if result['path']:
